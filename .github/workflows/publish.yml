@@ -15,6 +15,9 @@ jobs:
       uses: actions/setup-node@v1
       with:
         node-version: ${{ matrix.node-version }}
+      env:    
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    - name: Publish  
       run: |
         npm ci
         npm test
@@ -23,7 +26,3 @@ jobs:
         echo publish $TARGET_VERSION
         npm version $TARGET_VERSION --git-tag-version=false
         npm publish --tag latest
-      env:    
-        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        
-      
