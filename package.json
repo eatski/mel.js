@@ -1,0 +1,39 @@
+{
+  "name": "node-mel",
+  "version": "0.0.0-test2",
+  "description": "Minimum Expression Language",
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "test": "jest",
+    "build": "tsc && cp src/parse/mel.pegjs dist/parse/mel.pegjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/itskihaga/node-mel.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/itskihaga/node-mel/issues"
+  },
+  "homepage": "https://github.com/itskihaga/node-mel#readme",
+  "dependencies": {
+    "fp-ts": "^2.8.2",
+    "io-ts": "^2.2.10",
+    "pegjs": "^0.10.0"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.11.0",
+    "@babel/preset-typescript": "^7.10.4",
+    "@types/jest": "^26.0.9",
+    "@types/lodash-es": "^4.17.3",
+    "@types/node": "^14.0.27",
+    "@types/pegjs": "^0.10.2",
+    "jest": "^26.2.2",
+    "ts-node": "^8.10.2",
+    "typescript": "^4.0.2"
+  }
+}
