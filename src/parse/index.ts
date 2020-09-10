@@ -2,7 +2,20 @@ import {parse as parseInner} from "./parse"
 import { Expression } from "../types"
 import { finalize } from "./finalize";
 
+export class ParseError extends Error {
+    constructor(err:Error){
+        super(err.message)
+        this._error = err;
+    }
+    public readonly _error : Error;
+}
+
 export const parse = (text:string) : Expression => {
-    const unfinalized = parseInner(text);
-    return finalize(unfinalized);
+    try {
+        const unfinalized = parseInner(text);
+        return finalize(unfinalized);
+    } catch (e) {
+        throw new ParseError(e)
+    }
+    
 }

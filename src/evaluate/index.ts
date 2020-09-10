@@ -1,6 +1,8 @@
 import { Expression, NumberResolvable, AdditiveExpression, StringResolvable, BooleanResolvable, EquivalenceComparisonExpression, AnyEquivalenceComparisonExpression, StringEquivalenceComparisonExpression, BooleanEquivalenceComparisonExpression, NumberEquivalenceComparisonExpression, NumericalComparisonExpression, MultiplicativeExpression } from "../types";
 import { Variable, Number, Boolean, String } from "../core";
 
+export class EvalutionError extends Error {}
+
 export const evalExpression = (exp:Expression ,resolve:VariableResolver): string | number | boolean => {
     switch (exp.type) {
         case "variable":
@@ -73,7 +75,7 @@ const evalAnyEquivalenceComparisonExpression = (exp:AnyEquivalenceComparisonExpr
     const _0 = evalVariable(exp._0,resolve);
     const _1 = evalVariable(exp._1,resolve);
     if(_0.type != _1.type){
-        throw new Error(`Invalid Camparision ${_0.type} and ${_1.type}`)
+        throw new EvalutionError(`Invalid Camparision ${_0.type} and ${_1.type}`)
     }
     switch (exp.op) {
         case "==":
@@ -134,14 +136,14 @@ const evalVariableAsNumber = (variable:Variable,resolve:VariableResolver):number
     if(res.type === "number"){
         return res.value;
     }
-    throw new Error(`[${variable.value}] is not number.`)
+    throw new EvalutionError(`[${variable.value}] is not number.`)
 }
 const evalVariableAsString = (variable:Variable,resolve:VariableResolver):string => {
     const res = evalVariable(variable,resolve)
     if(res.type === "string"){
         return res.value;
     }
-    throw new Error(`[${variable.value}] is not string.`)
+    throw new EvalutionError(`[${variable.value}] is not string.`)
 }
 
 const evalVariableAsBoolean = (variable:Variable,resolve:VariableResolver):boolean => {
@@ -149,7 +151,7 @@ const evalVariableAsBoolean = (variable:Variable,resolve:VariableResolver):boole
     if(res.type === "boolean"){
         return res.value;
     }
-    throw new Error(`[${variable.value}] is not boolean.`)
+    throw new EvalutionError(`[${variable.value}] is not boolean.`)
 }
 
 const evalVariable = (variable:Variable,resolve:VariableResolver):Number | Boolean | String=> {
@@ -171,7 +173,7 @@ const evalVariable = (variable:Variable,resolve:VariableResolver):Number | Boole
                 value
             }
         default:
-            throw new Error(`[${variable.value}] is ${typeof value}.`)
+            throw new EvalutionError(`[${variable.value}] is ${typeof value}.`)
     }
     
 }
@@ -199,9 +201,4 @@ const evalMultiplicativeExpression = (exp:MultiplicativeExpression,resolve:Varia
             return _0 % _1
     }
 }
-
-
-
-
-
 

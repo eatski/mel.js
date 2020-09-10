@@ -2,13 +2,17 @@
   "name": "node-mel",
   "version": "0.0.0-test2",
   "description": "Minimum Expression Language",
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
+  "bin": {
+    "mel":"bin/mel"
+  },
   "files": [
-    "dist"
+    "dist","bin"
   ],
   "scripts": {
     "test": "jest",
-    "build": "tsc && cp src/parse/mel.pegjs dist/parse/mel.pegjs"
+    "build": "tsc && cp ./src/parse/mel.pegjs ./dist/src/parse",
+    "start": "ts-node demo"
   },
   "repository": {
     "type": "git",
@@ -32,7 +36,9 @@
     "@types/lodash-es": "^4.17.3",
     "@types/node": "^14.0.27",
     "@types/pegjs": "^0.10.2",
+    "@types/prompts": "^2.0.8",
     "jest": "^26.2.2",
+    "prompts": "^2.3.2",
     "ts-node": "^8.10.2",
     "typescript": "^4.0.2"
   }
