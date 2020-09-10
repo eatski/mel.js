@@ -1,13 +1,14 @@
 {
-  "name": "node-mel",
+  "name": "meljs",
   "version": "0.0.0-test2",
   "description": "Minimum Expression Language",
   "main": "dist/src/index.js",
   "bin": {
-    "mel":"bin/mel"
+    "mel": "bin/mel"
   },
   "files": [
-    "dist","bin"
+    "dist",
+    "bin"
   ],
   "scripts": {
     "test": "jest",

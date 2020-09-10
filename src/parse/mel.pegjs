@@ -30,7 +30,7 @@ NumericalComparisonExpression
     }
 
 NumericalComparable = AdditiveExpression / Addable
-NumericalComparisonOperator = ">" / "<" / ">=" / "<="
+NumericalComparisonOperator = ">=" / "<=" / ">" / "<"
 
 // Addition
 
@@ -91,7 +91,7 @@ BoolValue
 AnyValue
     = Variable
 Variable
-    = &Keywords / prefix:VariablePrefix charset:[A-z]+{ 
+    = &Keywords / prefix:VariablePrefix charset:[A-z0-9]+{ 
         return {
             type:"variable",
             prefix,

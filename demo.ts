@@ -1,8 +1,6 @@
 import prompts, { PromptType } from "prompts";
 import {parse,evalExpression} from "./src"
 import { Expression } from "./src/types";
-import { ParseError } from "./src/parse";
-import { EvalutionError } from "./src/evaluate";
 
 
 type VarType = "string" | "number" | "boolean" | "variable"
