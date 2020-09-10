@@ -3,27 +3,27 @@ import { Variable, Number, Boolean, String } from "../core";
 
 export class EvalutionError extends Error {}
 
-export const evalExpression = (exp:Expression ,resolve:VariableResolver): string | number | boolean => {
+export const evalExpression = (exp:Expression ,variables:Variables): string | number | boolean => {
     switch (exp.type) {
         case "variable":
-            return evalVariable(exp,resolve).value;
+            return evalVariable(exp,variables).value;
         case "MultiplicativeExpression":
         case "AdditiveExpression":
         case "number":
-            return evalNumberResolvable(exp,resolve)
+            return evalNumberResolvable(exp,variables)
         case "AnyEquivalenceComparisonExpression":
         case "BooleanEquivalenceComparisonExpression":
         case "NumberEquivalenceComparisonExpression":
         case "NumericalComparisonExpression":
         case "StringEquivalenceComparisonExpression":
         case "boolean":
-            return evalBooleanResolvable(exp,resolve)
+            return evalBooleanResolvable(exp,variables)
         case "string":
-            return evalStringResolvable(exp,resolve)
+            return evalStringResolvable(exp,variables)
     }
 } 
 
-const evalNumberEquivalenceComparisonExpression = (exp:NumberEquivalenceComparisonExpression,resolve:VariableResolver) : boolean=> {
+const evalNumberEquivalenceComparisonExpression = (exp:NumberEquivalenceComparisonExpression,resolve:Variables) : boolean=> {
     const _0 = evalNumberResolvable(exp._0,resolve);
     const _1 = evalNumberResolvable(exp._1,resolve);
     switch (exp.op) {
@@ -34,7 +34,7 @@ const evalNumberEquivalenceComparisonExpression = (exp:NumberEquivalenceComparis
     }
 }
 
-const evalNumericalComparisonExpression = (exp:NumericalComparisonExpression,resolve:VariableResolver) : boolean => {
+const evalNumericalComparisonExpression = (exp:NumericalComparisonExpression,resolve:Variables) : boolean => {
     const _0 = evalNumberResolvable(exp._0,resolve);
     const _1 = evalNumberResolvable(exp._1,resolve);
     switch (exp.op) {
@@ -49,7 +49,7 @@ const evalNumericalComparisonExpression = (exp:NumericalComparisonExpression,res
     }
 }
 
-const evalStringEquivalenceComparisonExpression = (exp:StringEquivalenceComparisonExpression,resolve:VariableResolver) : boolean=> {
+const evalStringEquivalenceComparisonExpression = (exp:StringEquivalenceComparisonExpression,resolve:Variables) : boolean=> {
     const _0 = evalStringResolvable(exp._0,resolve);
     const _1 = evalStringResolvable(exp._1,resolve);
     switch (exp.op) {
@@ -60,7 +60,7 @@ const evalStringEquivalenceComparisonExpression = (exp:StringEquivalenceComparis
     }
 }
 
-const evalBooleanEquivalenceComparisonExpression = (exp:BooleanEquivalenceComparisonExpression,resolve:VariableResolver) : boolean=> {
+const evalBooleanEquivalenceComparisonExpression = (exp:BooleanEquivalenceComparisonExpression,resolve:Variables) : boolean=> {
     const _0 = evalBooleanResolvable(exp._0,resolve);
     const _1 = evalBooleanResolvable(exp._1,resolve);
     switch (exp.op) {
@@ -71,7 +71,7 @@ const evalBooleanEquivalenceComparisonExpression = (exp:BooleanEquivalenceCompar
     }
 }
 
-const evalAnyEquivalenceComparisonExpression = (exp:AnyEquivalenceComparisonExpression,resolve:VariableResolver) : boolean => {
+const evalAnyEquivalenceComparisonExpression = (exp:AnyEquivalenceComparisonExpression,resolve:Variables) : boolean => {
     const _0 = evalVariable(exp._0,resolve);
     const _1 = evalVariable(exp._1,resolve);
     if(_0.type != _1.type){
@@ -86,11 +86,11 @@ const evalAnyEquivalenceComparisonExpression = (exp:AnyEquivalenceComparisonExpr
     
     
 }
-interface VariableResolver {
-    (name:string):number | string | boolean | undefined
-}
+type ResolvedVariable = number | string | boolean | undefined
+type Variables = 
+    ((name:string) => ResolvedVariable) | Record<string,ResolvedVariable>
 
-const evalNumberResolvable = (expression:NumberResolvable,resolve:VariableResolver):number => {
+const evalNumberResolvable = (expression:NumberResolvable,resolve:Variables):number => {
     switch (expression.type) {
         case "number":            
             return expression.value;
@@ -103,7 +103,7 @@ const evalNumberResolvable = (expression:NumberResolvable,resolve:VariableResolv
     }
 }
 
-const evalStringResolvable = (str:StringResolvable,resolve:VariableResolver):string => {
+const evalStringResolvable = (str:StringResolvable,resolve:Variables):string => {
     switch (str.type) {
         case "string":            
             return str.value;
@@ -112,7 +112,7 @@ const evalStringResolvable = (str:StringResolvable,resolve:VariableResolver):str
     }
 }
 
-const evalBooleanResolvable = (expression:BooleanResolvable,resolve:VariableResolver):boolean => {
+const evalBooleanResolvable = (expression:BooleanResolvable,resolve:Variables):boolean => {
     switch (expression.type) {
         case "boolean":            
             return expression.value;
@@ -131,14 +131,14 @@ const evalBooleanResolvable = (expression:BooleanResolvable,resolve:VariableReso
     }
 }
 
-const evalVariableAsNumber = (variable:Variable,resolve:VariableResolver):number => {
+const evalVariableAsNumber = (variable:Variable,resolve:Variables):number => {
     const res = evalVariable(variable,resolve)
     if(res.type === "number"){
         return res.value;
     }
     throw new EvalutionError(`[${variable.value}] is not number.`)
 }
-const evalVariableAsString = (variable:Variable,resolve:VariableResolver):string => {
+const evalVariableAsString = (variable:Variable,resolve:Variables):string => {
     const res = evalVariable(variable,resolve)
     if(res.type === "string"){
         return res.value;
@@ -146,7 +146,7 @@ const evalVariableAsString = (variable:Variable,resolve:VariableResolver):string
     throw new EvalutionError(`[${variable.value}] is not string.`)
 }
 
-const evalVariableAsBoolean = (variable:Variable,resolve:VariableResolver):boolean => {
+const evalVariableAsBoolean = (variable:Variable,resolve:Variables):boolean => {
     const res = evalVariable(variable,resolve)
     if(res.type === "boolean"){
         return res.value;
@@ -154,8 +154,8 @@ const evalVariableAsBoolean = (variable:Variable,resolve:VariableResolver):boole
     throw new EvalutionError(`[${variable.value}] is not boolean.`)
 }
 
-const evalVariable = (variable:Variable,resolve:VariableResolver):Number | Boolean | String=> {
-    const value = resolve(variable.value)
+const evalVariable = (variable:Variable,resolve:Variables):Number | Boolean | String=> {
+    const value = typeof resolve === "function" ? resolve(variable.value) : resolve[variable.value]
     switch (typeof value) {
         case "boolean":
             return {
@@ -178,7 +178,7 @@ const evalVariable = (variable:Variable,resolve:VariableResolver):Number | Boole
     
 }
 
-const evalAdditiveExpression = (exp:AdditiveExpression,resolve:VariableResolver):number=> {
+const evalAdditiveExpression = (exp:AdditiveExpression,resolve:Variables):number=> {
     const _0 = evalNumberResolvable(exp._0,resolve);
     const _1 = evalNumberResolvable(exp._1,resolve);
     switch (exp.op) {
@@ -189,14 +189,14 @@ const evalAdditiveExpression = (exp:AdditiveExpression,resolve:VariableResolver)
     }
 }
 
-const evalMultiplicativeExpression = (exp:MultiplicativeExpression,resolve:VariableResolver):number=> {
+const evalMultiplicativeExpression = (exp:MultiplicativeExpression,resolve:Variables):number=> {
     const _0 = evalNumberResolvable(exp._0,resolve);
     const _1 = evalNumberResolvable(exp._1,resolve);
     switch (exp.op) {
         case "*":
             return _0 * _1;
         case "/":
-            return _0 / _1;
+            return Math.floor(_0 / _1);
         case "%":
             return _0 % _1
     }
