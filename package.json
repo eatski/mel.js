@@ -7,7 +7,7 @@
     "mel":"bin/mel"
   },
   "files": [
-    "dist"
+    "dist","bin"
   ],
   "scripts": {
     "test": "jest",
