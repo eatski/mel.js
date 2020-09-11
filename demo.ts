@@ -44,6 +44,12 @@ const findVariables = (expression:Expression,type: VarType,acc:HoistedVar[] = []
                 ...findVariables(expression._0,"string",acc),
                 ...findVariables(expression._1,"string",acc)
             ])
+        case "EmbeddableString":
+            return add([
+                ...findVariables(expression._0,"string",acc),
+                ...findVariables(expression._1,"string",acc),
+                ...findVariables(expression._2,"string",acc)
+            ])
         case "boolean":
         case "number":
         case "string":

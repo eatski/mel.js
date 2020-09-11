@@ -1,8 +1,9 @@
 import {generate} from "pegjs"
 import { readFileSync } from "fs";
 import * as t from "io-ts";
-import { ValueIO, MultiplicativeOperatorIOs, AdditiveOperatorIOs, NumericalComparisonOperatorIOs, EquivalenceComparisonOperatorIOs, Value } from "../core";
+import { ValueIO, MultiplicativeOperatorIOs, AdditiveOperatorIOs, NumericalComparisonOperatorIOs, EquivalenceComparisonOperatorIOs, Value, String, Variable, StringIO, VariableIO } from "../core";
 import { ToUnion, recursiveUnion, asConstMixed } from "../util";
+import { isRight } from "fp-ts/lib/Either";
 
 type InfixExpression<T extends string,I extends string,L> = {
     type:T,
@@ -45,7 +46,21 @@ const GroupingIO : t.Type<Grouping> = t.recursion("Grouping", () => t.type({
     content:UnfinalizedExpressionIO
 }))
 
-const UnfinalizedValueIO = recursiveUnion(() => asConstMixed([ValueIO,GroupingIO]))
+export interface UnfinalizedEmbeddableString{
+    type:"EmbeddableString",
+    left: String,
+    value: Variable,
+    right: String | UnfinalizedEmbeddableString
+}
+
+const EmbeddableStringIO : t.Type<UnfinalizedEmbeddableString> = t.recursion("EmbeddableString",() => t.type({
+    type:t.literal("EmbeddableString"),
+    left:StringIO,
+    value: VariableIO,
+    right: t.union([StringIO,EmbeddableStringIO])
+}))
+
+const UnfinalizedValueIO = recursiveUnion(() => [ValueIO,EmbeddableStringIO,GroupingIO])
 
 const MultiplicativeExpressionIO = toInfixExpressionIO(
     "MultiplicativeExpression",
@@ -79,8 +94,6 @@ const EquivalenceComparisonExpressionIO = toInfixExpressionIO(
     () => EquivalenceComparableIO
 )
 
-
-
 export type UnfinalizedEquivalenceComparisonExpression = t.TypeOf<typeof EquivalenceComparisonExpressionIO>
 const UnfinalizedExpressionIO = recursiveUnion(() => [EquivalenceComparableIO,EquivalenceComparisonExpressionIO])
 
@@ -89,10 +102,11 @@ const parser = generate(readFileSync(__dirname + "/mel.pegjs").toString())
 export const parse = (text:string) => {
     const parsed = parser.parse(text)
     const decoded = UnfinalizedExpressionIO.decode(parsed)
-    if(decoded._tag === "Right"){
-        return decoded.right
-    }
-    throw decoded.left
+    if(isRight(decoded)) return decoded.right
+    throw new Error([
+        "[IO Type Error] The following values have incorrect types.",
+        decoded.left.map(e => "- " +JSON.stringify(e.value)) 
+    ].join("\n"))
 }
 
 
