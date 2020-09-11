@@ -1,6 +1,6 @@
 {
   "name": "meljs",
-  "version": "0.0.0-test2",
+  "version": "0.0.0",
   "description": "Minimum Expression Language",
   "main": "dist/src/index.js",
   "bin": {
