@@ -1,4 +1,4 @@
-import { Expression, NumberResolvable, AdditiveExpression, StringResolvable, BooleanResolvable, EquivalenceComparisonExpression, AnyEquivalenceComparisonExpression, StringEquivalenceComparisonExpression, BooleanEquivalenceComparisonExpression, NumberEquivalenceComparisonExpression, NumericalComparisonExpression, MultiplicativeExpression } from "../types";
+import { Expression, NumberResolvable, AdditiveExpression, StringResolvable, BooleanResolvable, EquivalenceComparisonExpression, AnyEquivalenceComparisonExpression, StringEquivalenceComparisonExpression, BooleanEquivalenceComparisonExpression, NumberEquivalenceComparisonExpression, NumericalComparisonExpression, MultiplicativeExpression, EmbeddableString } from "../types";
 import { Variable, Number, Boolean, String } from "../core";
 
 export class EvalutionError extends Error {}
@@ -18,6 +18,7 @@ export const evalExpression = (exp:Expression ,variables:Variables): string | nu
         case "StringEquivalenceComparisonExpression":
         case "boolean":
             return evalBooleanResolvable(exp,variables)
+        case "EmbeddableString":
         case "string":
             return evalStringResolvable(exp,variables)
     }
@@ -109,6 +110,8 @@ const evalStringResolvable = (str:StringResolvable,resolve:Variables):string => 
             return str.value;
         case "variable":
             return evalVariableAsString(str,resolve);
+        case "EmbeddableString":
+            return evalEmbeddableString(str,resolve)
     }
 }
 
@@ -200,5 +203,11 @@ const evalMultiplicativeExpression = (exp:MultiplicativeExpression,resolve:Varia
         case "%":
             return _0 % _1
     }
+}
+
+const evalEmbeddableString = (expression:EmbeddableString,variables:Variables):string => {
+    return evalStringResolvable(expression._0,variables) + 
+    evalStringResolvable(expression._1,variables) + 
+    evalStringResolvable(expression._2,variables)
 }
 

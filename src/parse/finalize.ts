@@ -1,5 +1,5 @@
-import { UnfinalizedExpression,UnfinalizedAdditiveExpression, UnfinalizedMultiplicativeExpression, UnfinalizedNumericalComparisonExpression, UnfinalizedEquivalenceComparisonExpression } from "./parse"
-import { NumberResolvable, Expression, MultiplicativeExpression, AdditiveExpression, NumericalComparisonExpression, BooleanResolvable, StringResolvable, EquivalenceComparisonExpression } from "../types"
+import { UnfinalizedExpression,UnfinalizedAdditiveExpression, UnfinalizedMultiplicativeExpression, UnfinalizedNumericalComparisonExpression, UnfinalizedEquivalenceComparisonExpression, UnfinalizedEmbeddableString } from "./parse"
+import { NumberResolvable, Expression, MultiplicativeExpression, AdditiveExpression, NumericalComparisonExpression, BooleanResolvable, StringResolvable, EquivalenceComparisonExpression, EmbeddableString } from "../types"
 import { Number, Variable, Boolean, String } from "../core"
 
 export const finalize = (expression:UnfinalizedExpression):Expression => {
@@ -64,11 +64,13 @@ const finalizeBooleanResolvable = (parsed:UnfinalizedBooleanResolvable) : Boolea
     }
 }
 
-type UnfinalizedStringResolvable = String | Variable
+type UnfinalizedStringResolvable = String | Variable | UnfinalizedEmbeddableString
 const narrowToUnfinalizedStringResolvable = (expression:UnfinalizedExpression):UnfinalizedStringResolvable | false => {
     switch (expression.type) {
         case "string":
         case "variable":
+            return expression
+        case "EmbeddableString":
             return expression
         case "Grouping":
             return narrowToUnfinalizedStringResolvable(expression.content)
@@ -80,6 +82,8 @@ const finalizeStringResolvable = (parsed:UnfinalizedStringResolvable) : StringRe
         case "string":
         case "variable":
             return parsed;
+        case "EmbeddableString":
+            return finalizeEmbeddableString(parsed)
     }
 }
 
@@ -199,4 +203,13 @@ const finalizeEquivalenceComparisonExpression = (expression:UnfinalizedEquivalen
         }
     }
     throw new Error("Unreachable") //FIXME: Unreachable
+}
+
+const finalizeEmbeddableString = (expression:UnfinalizedEmbeddableString):EmbeddableString => {
+    return {
+        type:"EmbeddableString",
+        _0:finalizeStringResolvable(expression.left),
+        _1:finalizeStringResolvable(expression.value),
+        _2:finalizeStringResolvable(expression.right)
+    }
 }

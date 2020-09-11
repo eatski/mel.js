@@ -74,12 +74,23 @@ NumberValue
     }
 
 StringValue
-    = "'" charset:CharLiteral+ "'" { 
+    = "'" content:StringContent "'" {
+        return content
+    }
+
+StringContent = EmbeddableString / CharLiterals
+
+EmbeddableString
+    = left:CharLiterals "{{" _ value:Variable _ "}}" right:StringContent {
         return {
-            type:"string",
-            value:charset.join("")
+            type:"EmbeddableString",
+            left,
+            right,
+            value
         }
     }
+
+
 BoolValue 
     = bool:BoolLiteral {
         return {
@@ -105,7 +116,14 @@ VariablePrefix
 Keywords = BoolLiteral 
 BoolLiteral = "true" / "false"
 DigitLiteral = "0" / [-]? [1-9] [0-9]*
-CharLiteral = [^']
+/* FIXME: for EmbeddableString*/
+CharLiterals = charset:CharLiteral* {
+    return  {
+        type:"string",
+        value:charset.join("")
+    }
+}
+CharLiteral = [^'{}]
 
 Grouping = "(" _ content:Expression _ ")" {
     return {

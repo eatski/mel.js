@@ -1,5 +1,5 @@
 import { parse } from "."
-import { StringEquivalenceComparisonExpression, MultiplicativeExpression } from "../types"
+import { StringEquivalenceComparisonExpression, MultiplicativeExpression, EmbeddableString } from "../types"
 import { Variable,String } from "../core"
 
 describe("パース", () => {
@@ -76,5 +76,35 @@ describe("パース", () => {
         }
         expect(res).toEqual(expected)
     })
+    test("埋め込み文字列",() => {
+        const res = parse("'aaa{{hoge}}aa'")
+        const expected: EmbeddableString = {
+            type: "EmbeddableString",
+            _0: {
+                type:"string",
+                value:"aaa"
+            },
+            _1: {
+                type:"variable",
+                value: "hoge",
+                prefix:null
+            },
+            _2: {
+                type:"string",
+                value:"aa"
+            }
+        }
+        expect(res).toEqual(expected)
+    })
+    //TODO: 
+    // test("埋め込み文字列じゃない",() => {
+    //     const res = parse("'aaa{hoge}aa'")
+    //     const expected: String = {
+    //         type: "string",
+    //         value: "aaa{hoge}aa"
+    //     }
+        
+    //     expect(res).toEqual(expected)
+    // })
 
 })

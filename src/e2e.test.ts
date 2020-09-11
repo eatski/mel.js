@@ -56,6 +56,10 @@ describe("E2E", () => {
         const parsed2 = parse("num == 5 == (str == 'foo')");
         expect(evalExpression(parsed2, {num:5,str:"foo"})).toBe(true)
     })
+    test("variable in String",() => {
+        const parsed1 = parse("'My name is {{name}}.'");
+        expect(evalExpression(parsed1, {name:"Joe"})).toBe("My name is Joe.")
+    })
     test("Syntax Error", () => {
         expect(() => parse("'aaa' > -10")).toThrowError()
         expect(() => parse("false > -10")).toThrowError()

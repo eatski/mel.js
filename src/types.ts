@@ -3,7 +3,7 @@ import { MultiplicativeOperator, AdditiveOperator, NumericalComparisonOperator, 
 export type Expression = NumberResolvable | BooleanResolvable | StringResolvable | AnyResolvable
 export type NumberResolvable = MultiplicativeExpression | AdditiveExpression | Number | AnyResolvable
 export type BooleanResolvable = NumericalComparisonExpression | EquivalenceComparisonExpression | Boolean | AnyResolvable
-export type StringResolvable = String | AnyResolvable
+export type StringResolvable = String | AnyResolvable | EmbeddableString
 export type AnyResolvable = Variable
 
 export interface MultiplicativeExpression {
@@ -60,3 +60,10 @@ export type EquivalenceComparisonExpression =
     BooleanEquivalenceComparisonExpression | 
     StringEquivalenceComparisonExpression | 
     AnyEquivalenceComparisonExpression
+
+export interface EmbeddableString {
+    type:"EmbeddableString",
+    _0:StringResolvable,
+    _1:StringResolvable,
+    _2:StringResolvable
+}

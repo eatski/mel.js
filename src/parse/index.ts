@@ -6,7 +6,7 @@ export class ParseError extends Error {
     constructor(err:Error,exp:string){
         super(`
         ${exp} 
-        ${err.message}`
+        ${err}`
         )
         this._error = err;
     }
