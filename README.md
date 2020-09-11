@@ -17,6 +17,22 @@ console.log(evalExpression(ast,{foo:15,bar:1})); //true
 console.log(evalExpression(ast,{foo:10,bar:-2})); //false
 ```
 
+## API
+
+### parse
+---
+convert string to AST
+```ts
+(text:string) => Expression
+```
+### evalExpression
+---
+compute to value(number | string | boolean) from AST and variables
+```ts
+(experssion:Expression,variables:Variables) => number | string | boolean
+```
+
+
 ## CLI demo
 ```bash
 npx mel
