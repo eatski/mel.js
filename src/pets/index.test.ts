@@ -1,4 +1,4 @@
-import {regexp, chars, sequence, Parser, _matchSeq, choice, recur} from "."
+import {regexp, chars, sequence, Parser, choice, recur} from "."
 
 test("sequence",() => {
     const Num = regexp("[1-9][0-9]*").then(parseInt)

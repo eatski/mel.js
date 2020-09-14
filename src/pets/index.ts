@@ -5,7 +5,7 @@ export interface Parser<T> {
 }
 type Parsers<T> = { [P in keyof T]: Parser<T[P]> };
 type ParseResultTypeSuccess = "match" 
-type ParseResultTypeFailure = "not" 
+type ParseResultTypeFailure = "failure" 
 type ParseResultSuccess<T> = {result:ParseResultTypeSuccess,content:T}
 type ParseResultSuccessInner<T> = {result:ParseResultTypeSuccess,content:T,unconsumed:string}
 type ParseResultFailure = {result:ParseResultTypeFailure}
@@ -27,7 +27,7 @@ const createMatcher = <T>(arg:Pick<Parser<T>,"__parse__AllowUnconsumed__">):Pars
                                 unconsumed:res.unconsumed,
                                 content:mapper(res.content),
                             }
-                        case "not":
+                        case "failure":
                             return {
                                 result:res.result
                             }
@@ -37,7 +37,7 @@ const createMatcher = <T>(arg:Pick<Parser<T>,"__parse__AllowUnconsumed__">):Pars
         },
         parse(str){
             const res = arg.__parse__AllowUnconsumed__(str);
-            if(res.result === "not"){
+            if(res.result === "failure"){
                 return res
             }
             if(res.unconsumed === ""){
@@ -47,7 +47,7 @@ const createMatcher = <T>(arg:Pick<Parser<T>,"__parse__AllowUnconsumed__">):Pars
                 }
             }
             return {
-                result:"not"
+                result:"failure"
             }
         }
     }
@@ -66,17 +66,34 @@ export const sequence = <T extends Array<unknown>>(...parsers:Parsers<T>): Parse
     })
 }
 
+const _matchSeq = <T>(str:string,parsers:Parser<T>[]):ParserResultInner<T[]> => {
+    const fn = (cur:string,num:number = 0,prev:T[]=[]):ParserResultInner<T[]> => {
+        const parser = parsers[num]
+        const res = parser.__parse__AllowUnconsumed__(cur)
+        switch (res.result) {
+            case "match":
+                const content = [...prev,res.content]
+                return parsers[num + 1] ? 
+                    fn(res.unconsumed,num + 1,content) : 
+                    {result:"match",content,unconsumed:res.unconsumed}
+            case "failure":
+                return {result:"failure"}
+        }
+    }
+    return fn(str);
+}
+
 export const choice = <T extends Array<unknown>>(...parsers:Parsers<T>) :Parser<T[number]> => {
     return createMatcher({
         __parse__AllowUnconsumed__(str){
             const fn = (num:number = 0):ParserResultInner<T[number]> => {
                 const parser = parsers[num]
-                if(typeof parser == "undefined") return {result:"not"};
+                if(typeof parser == "undefined") return {result:"failure"};
                 const res = parser.__parse__AllowUnconsumed__(str);
                 switch (res.result) {
                     case "match":  
                         return res
-                    case "not":
+                    case "failure":
                         return fn(num + 1)
                 }
             }
@@ -91,7 +108,7 @@ export const regexp = (exp:string):Parser<string> => {
         __parse__AllowUnconsumed__(str){
             const result = matcher.exec(str);
             if(!result){
-                return {result:"not"}
+                return {result:"failure"}
             }
             const [,content,unconsumed] = result
             return {content:content,result:"match",unconsumed}
@@ -108,7 +125,7 @@ export const chars = <S extends string>(literal:S):Parser<S> => {
         __parse__AllowUnconsumed__(str){
             const result = matcher.exec(str);
             if(!result){
-                return {result:"not"}
+                return {result:"failure"}
             }
             const [,,unconsumed] = result
             return {content:literal,result:"match",unconsumed}
@@ -117,22 +134,4 @@ export const chars = <S extends string>(literal:S):Parser<S> => {
 }
 
 
-export const _matchSeq = <T>(str:string,parsers:Parser<T>[]):ParserResultInner<T[]> => {
-    const fn = (cur:string,num:number = 0,prev:T[]=[]):ParserResultInner<T[]> => {
-        const parser = parsers[num]
-        const res = parser.__parse__AllowUnconsumed__(cur)
-        switch (res.result) {
-            case "match":
-                if(parsers[num + 1]) {
-                    return fn(res.unconsumed,num + 1,[...prev,res.content])
-                } else {
-                    return {result:"match",content:[...prev,res.content],unconsumed:res.unconsumed}
-                }
-            case "not":
-                return {
-                    result:res.result
-                }
-        }
-    }
-    return fn(str);
-}
+
