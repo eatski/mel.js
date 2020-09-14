@@ -1,46 +1,77 @@
-import {regexp, chars, sequence, Parser, choice, recur} from "."
+import { regexp, chars, sequence, Parser, choice, recur, multi, ParserResult } from "."
 
-test("sequence",() => {
+const log = (name: string) => (...args: any) => console.log(name, ...args)
+
+test("sequence", () => {
     const Num = regexp("[1-9][0-9]*").then(parseInt)
-    const AdditiveExpression = sequence(Num,chars("+"),Num)
+    const AdditiveExpression = sequence(Num, chars("+"), Num)
     const res1 = AdditiveExpression.parse("11+12")
-    expect(res1).toStrictEqual({result:"match",content:[11,'+',12]})
+    expect(res1).toStrictEqual({ result: "match", content: [11, '+', 12] })
 })
 
-test("choice",() => {
+test("choice", () => {
     const Num = regexp("[1-9][0-9]*").then(parseInt)
     const AtoZ = regexp("[1-9a-z]*")
-    const res1 = choice(Num,AtoZ).parse("a1")
+    const res1 = choice(Num, AtoZ).parse("a1")
     expect(res1).toStrictEqual({
-        result:"match",
-        content:"a1"
+        result: "match",
+        content: "a1"
     })
-    const res2 = choice(Num,AtoZ).parse("123")
+    const res2 = choice(Num, AtoZ).parse("123")
     expect(res2).toStrictEqual({
-        result:"match",
-        content:123
+        result: "match",
+        content: 123
     })
 })
 
-test("Calulate Additive",() => {
+test("multi", () => {
+    const Text = regexp("[a-zA-z]+")
+    const TagName = regexp("[a-z]+")
+    const TagStart = sequence(chars("<"), TagName, chars(">")).then(([, name,]) => name)
+    const TagEnd = sequence(chars("</"), TagName, chars(">")).then(([, name,]) => name)
+    type Xml = {
+        tagName: string,
+        elements: (Xml | string)[]
+    }
+    const Xml: Parser<Xml> =
+        recur(() => sequence(TagStart, Elements, TagEnd))
+            .then(([tagName, elements]) => ({ tagName, elements }))
+    const Element = choice(Xml, Text)
+    const Elements = multi(Element)
+    const res3 = Xml.parse("<body><p>hello</p>world<div>friend</div></body>")
+    const expect3: ParserResult<Xml> = {
+        result: "match",
+        content: {
+            tagName: "body",
+            elements: [
+                { tagName: "p", elements: ["hello"] },
+                "world",
+                { tagName: "div", elements: ["friend"] }
+            ]
+        }
+    }
+    expect(res3).toEqual(expect3)
+})
+
+test("Calulate Additive", () => {
     const Num = regexp("[1-9][0-9]*").then(parseInt)
     const AdditveOperator = chars("+")
-    const Additive = recur(() => choice(AdditiveExpression,Num))
-    const AdditiveExpression : Parser<number> = sequence(Num,AdditveOperator,Additive)
-        .then(([left,,right])=> left + right)
+    const Additive = recur(() => choice(AdditiveExpression, Num))
+    const AdditiveExpression: Parser<number> = sequence(Num, AdditveOperator, Additive)
+        .then(([left, , right]) => left + right)
     const res1 = AdditiveExpression.parse("10+90+11")
     expect(res1).toStrictEqual({ result: 'match', content: 111 })
 })
 
-test("Additive",() => {
+test("Additive", () => {
     const Num = regexp("[1-9][0-9]*").then(parseInt)
     const AdditveOperator = chars("+")
     type Additive = AdditiveExpression | number
-    const Additive = recur(() => choice(AdditiveExpression,Num))
-    type AdditiveExpression = [number, "+" ,Additive]
-    const AdditiveExpression : Parser<AdditiveExpression> = sequence(Num,AdditveOperator,Additive)
+    const Additive = recur(() => choice(AdditiveExpression, Num))
+    type AdditiveExpression = [number, "+", Additive]
+    const AdditiveExpression: Parser<AdditiveExpression> = sequence(Num, AdditveOperator, Additive)
     const res1 = AdditiveExpression.parse("10+90+11")
-    expect(res1).toStrictEqual({ result: 'match', content: [ 10, '+', [ 90, '+', 11 ] ] })
+    expect(res1).toStrictEqual({ result: 'match', content: [10, '+', [90, '+', 11]] })
 })
 
 

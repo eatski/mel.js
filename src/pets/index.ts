@@ -1,7 +1,8 @@
 export interface Parser<T> {
     __parse__AllowUnconsumed__(str:string):ParserResultInner<T>,
     parse(str:string):ParserResult<T>
-    then<R>(mapper: (result:T) => R):Parser<R>
+    then<R>(mapper: (result:T) => R):Parser<R>,
+    onParsed(cb:(str:string,parsed:ParserResultInner<T>) => void):Parser<T>
 }
 type Parsers<T> = { [P in keyof T]: Parser<T[P]> };
 type ParseResultTypeSuccess = "match" 
@@ -32,6 +33,15 @@ const createMatcher = <T>(arg:Pick<Parser<T>,"__parse__AllowUnconsumed__">):Pars
                                 result:res.result
                             }
                     }
+                }
+            })
+        },
+        onParsed(cb){
+            return createMatcher({
+                __parse__AllowUnconsumed__(str){
+                    const res = arg.__parse__AllowUnconsumed__(str)
+                    cb(str,res);
+                    return res;
                 }
             })
         },
@@ -98,6 +108,26 @@ export const choice = <T extends Array<unknown>>(...parsers:Parsers<T>) :Parser<
                 }
             }
             return fn()
+        }
+    })
+}
+
+export const multi = <T>(parser:Parser<T>) : Parser<T[]> => {
+    return createMatcher({
+        __parse__AllowUnconsumed__(str){
+            const fn = (cur:string=str,acc:T[]=[]):ParserResultInner<T[]> => {
+                const res = parser.__parse__AllowUnconsumed__(cur);
+                switch (res.result) {
+                    case "match":
+                        const content = [...acc,res.content]
+                        return res.unconsumed !== "" ? 
+                            fn(res.unconsumed,content) : 
+                            {result:"match",content,unconsumed:res.unconsumed}
+                    case "failure":
+                        return  {result:"match",content:acc,unconsumed:cur}
+                }
+            }
+            return fn();
         }
     })
 }
