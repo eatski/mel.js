@@ -3,23 +3,17 @@ export interface Parser<T> {
     parse(str:string):ParserResult<T>
     then<R>(mapper: (result:T) => R):Parser<R>
 }
-export const recur = <T>(factory:() => Parser<T>):Parser<T> => createMatcher({
-    __parse__AllowUnconsumed__(str){
-        return factory().__parse__AllowUnconsumed__(str);
-    }
-})
 type Parsers<T> = { [P in keyof T]: Parser<T[P]> };
-
 type ParseResultTypeSuccess = "match" 
 type ParseResultTypeFailure = "not" 
 type ParseResultSuccess<T> = {result:ParseResultTypeSuccess,content:T}
 type ParseResultSuccessInner<T> = {result:ParseResultTypeSuccess,content:T,unconsumed:string}
 type ParseResultFailure = {result:ParseResultTypeFailure}
 
-export type ParserResultInner<T> = ParseResultFailure | ParseResultSuccessInner<T>
+type ParserResultInner<T> = ParseResultFailure | ParseResultSuccessInner<T>
 export type ParserResult<T> = ParseResultFailure | ParseResultSuccess<T>
 
-const createMatcher  = <T>(arg:Pick<Parser<T>,"__parse__AllowUnconsumed__">):Parser<T> => {
+const createMatcher = <T>(arg:Pick<Parser<T>,"__parse__AllowUnconsumed__">):Parser<T> => {
     return {
         ...arg,
         then(mapper){
@@ -57,6 +51,19 @@ const createMatcher  = <T>(arg:Pick<Parser<T>,"__parse__AllowUnconsumed__">):Par
             }
         }
     }
+}
+export const recur = <T>(factory:() => Parser<T>):Parser<T> => createMatcher({
+    __parse__AllowUnconsumed__(str){
+        return factory().__parse__AllowUnconsumed__(str);
+    }
+})
+
+export const sequence = <T extends Array<unknown>>(...parsers:Parsers<T>): Parser<T> => {
+    return createMatcher({
+        __parse__AllowUnconsumed__(str){
+            return _matchSeq(str,parsers) as ParserResultInner<T>
+        }
+    })
 }
 
 export const choice = <T extends Array<unknown>>(...parsers:Parsers<T>) :Parser<T[number]> => {
@@ -109,13 +116,6 @@ export const chars = <S extends string>(literal:S):Parser<S> => {
     })
 }
 
-export const sequence = <T extends Array<unknown>>(...parsers:Parsers<T>): Parser<T> => {
-    return createMatcher({
-        __parse__AllowUnconsumed__(str){
-            return _matchSeq(str,parsers) as ParserResultInner<T>
-        }
-    })
-}
 
 export const _matchSeq = <T>(str:string,parsers:Parser<T>[]):ParserResultInner<T[]> => {
     const fn = (cur:string,num:number = 0,prev:T[]=[]):ParserResultInner<T[]> => {

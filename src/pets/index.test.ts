@@ -1,25 +1,15 @@
 import {regexp, chars, sequence, Parser, _matchSeq, choice, recur} from "."
 
-const Num = regexp("[1-9][0-9]*").then(parseInt)
-const AtoZ = regexp("[1-9a-z]*")
-const AdditveOperator = chars("+")
-
-type Additve = number | AdditiveExpression
-type AdditiveExpression = [number,"+",Additve]
-const AdditiveExpression : Parser<AdditiveExpression>= sequence(
-    Num,
-    AdditveOperator,
-    recur(() => choice(AdditiveExpression,Num))
-)
-
 test("sequence",() => {
-    const res2 = _matchSeq<number | "+">("11+12",[Num,AdditveOperator,Num])
-    expect(res2).toStrictEqual({result:"match",content:[11,'+',12],unconsumed: ""})
-    const res3 = AdditiveExpression.parse("11+12")
-    expect(res3).toStrictEqual({result:"match",content:[11,'+',12]})
+    const Num = regexp("[1-9][0-9]*").then(parseInt)
+    const AdditiveExpression = sequence(Num,chars("+"),Num)
+    const res1 = AdditiveExpression.parse("11+12")
+    expect(res1).toStrictEqual({result:"match",content:[11,'+',12]})
 })
 
 test("choice",() => {
+    const Num = regexp("[1-9][0-9]*").then(parseInt)
+    const AtoZ = regexp("[1-9a-z]*")
     const res1 = choice(Num,AtoZ).parse("a1")
     expect(res1).toStrictEqual({
         result:"match",
@@ -32,9 +22,25 @@ test("choice",() => {
     })
 })
 
-test("Additve",() => {
-    const res1 = AdditiveExpression.parse("11+12+13")
-    expect(res1).toStrictEqual({ result: 'match', content: [ 11, '+', [ 12, '+', 13 ] ] })
+test("Calulate Additive",() => {
+    const Num = regexp("[1-9][0-9]*").then(parseInt)
+    const AdditveOperator = chars("+")
+    const Additive = recur(() => choice(AdditiveExpression,Num))
+    const AdditiveExpression : Parser<number> = sequence(Num,AdditveOperator,Additive)
+        .then(([left,,right])=> left + right)
+    const res1 = AdditiveExpression.parse("10+90+11")
+    expect(res1).toStrictEqual({ result: 'match', content: 111 })
+})
+
+test("Additive",() => {
+    const Num = regexp("[1-9][0-9]*").then(parseInt)
+    const AdditveOperator = chars("+")
+    type Additive = AdditiveExpression | number
+    const Additive = recur(() => choice(AdditiveExpression,Num))
+    type AdditiveExpression = [number, "+" ,Additive]
+    const AdditiveExpression : Parser<AdditiveExpression> = sequence(Num,AdditveOperator,Additive)
+    const res1 = AdditiveExpression.parse("10+90+11")
+    expect(res1).toStrictEqual({ result: 'match', content: [ 10, '+', [ 90, '+', 11 ] ] })
 })
 
 
