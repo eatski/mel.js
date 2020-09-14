@@ -1,0 +1,1 @@
+export const asConst = <T extends Array<any>>(...args:T) :T => args
