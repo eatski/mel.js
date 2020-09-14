@@ -1,34 +1,37 @@
 export interface Parser<T> {
-    parse(str:string):ParseResult<T>,
+    __parse__AllowUnconsumed__(str:string):ParserResultInner<T>,
+    parse(str:string):ParserResult<T>
     then<R>(mapper: (result:T) => R):Parser<R>
 }
 export const recur = <T>(factory:() => Parser<T>):Parser<T> => createMatcher({
-    parse(str){
-        return factory().parse(str);
+    __parse__AllowUnconsumed__(str){
+        return factory().__parse__AllowUnconsumed__(str);
     }
 })
 type Parsers<T> = { [P in keyof T]: Parser<T[P]> };
 
-type ParseResultTypeSuccess = "match" | "exact"
+type ParseResultTypeSuccess = "match" 
 type ParseResultTypeFailure = "not" 
 type ParseResultSuccess<T> = {result:ParseResultTypeSuccess,content:T}
+type ParseResultSuccessInner<T> = {result:ParseResultTypeSuccess,content:T,unconsumed:string}
 type ParseResultFailure = {result:ParseResultTypeFailure}
 
-export type ParseResult<T> = ParseResultFailure | ParseResultSuccess<T>
+export type ParserResultInner<T> = ParseResultFailure | ParseResultSuccessInner<T>
+export type ParserResult<T> = ParseResultFailure | ParseResultSuccess<T>
 
-const createMatcher  = <T>(arg:Pick<Parser<T>,"parse">):Parser<T> => {
+const createMatcher  = <T>(arg:Pick<Parser<T>,"__parse__AllowUnconsumed__">):Parser<T> => {
     return {
         ...arg,
         then(mapper){
             return createMatcher({
-                parse(str:string){
-                    const res = arg.parse(str)
+                __parse__AllowUnconsumed__(str:string){
+                    const res = arg.__parse__AllowUnconsumed__(str)
                     switch (res.result) {
-                        case "exact":
                         case "match":
                             return {
                                 result:res.result,
-                                content:mapper(res.content)
+                                unconsumed:res.unconsumed,
+                                content:mapper(res.content),
                             }
                         case "not":
                             return {
@@ -37,19 +40,33 @@ const createMatcher  = <T>(arg:Pick<Parser<T>,"parse">):Parser<T> => {
                     }
                 }
             })
+        },
+        parse(str){
+            const res = arg.__parse__AllowUnconsumed__(str);
+            if(res.result === "not"){
+                return res
+            }
+            if(res.unconsumed === ""){
+                return {
+                    result:res.result,
+                    content:res.content,
+                }
+            }
+            return {
+                result:"not"
+            }
         }
     }
 }
 
 export const choice = <T extends Array<unknown>>(...parsers:Parsers<T>) :Parser<T[number]> => {
     return createMatcher({
-        parse(str){
-            const fn = (num:number = 0):ParseResult<T[number]> => {
+        __parse__AllowUnconsumed__(str){
+            const fn = (num:number = 0):ParserResultInner<T[number]> => {
                 const parser = parsers[num]
                 if(typeof parser == "undefined") return {result:"not"};
-                const res = parser.parse(str);
+                const res = parser.__parse__AllowUnconsumed__(str);
                 switch (res.result) {
-                    case "exact":
                     case "match":  
                         return res
                     case "not":
@@ -59,45 +76,58 @@ export const choice = <T extends Array<unknown>>(...parsers:Parsers<T>) :Parser<
             return fn()
         }
     })
-} 
+}
 
-export const regexp = (exp:RegExp):Parser<string> => {
+export const regexp = (exp:string):Parser<string> => {
+    const matcher = new RegExp(`^(${exp})(.*)$`)
     return createMatcher({
-        parse(str){
-            return exp.test(str) ? {content:str,result:"match"} : {result:"not"}
+        __parse__AllowUnconsumed__(str){
+            const result = matcher.exec(str);
+            if(!result){
+                return {result:"not"}
+            }
+            const [,content,unconsumed] = result
+            return {content:content,result:"match",unconsumed}
         },
     })
 }
 
-export const chars = <S extends string>(matcher:S):Parser<S> => {
+const escapeRegExp = (text:string) => text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+
+export const chars = <S extends string>(literal:S):Parser<S> => {
+    const escaped = escapeRegExp(literal);
+    const matcher = new RegExp(`^(${escaped})(.*)$`)
     return createMatcher({
-        parse(str:string){
-            return matcher === str ? 
-                {content:matcher,result:"exact"} : {result:"not"}
-        }
+        __parse__AllowUnconsumed__(str){
+            const result = matcher.exec(str);
+            if(!result){
+                return {result:"not"}
+            }
+            const [,,unconsumed] = result
+            return {content:literal,result:"match",unconsumed}
+        },
     })
 }
 
 export const sequence = <T extends Array<unknown>>(...parsers:Parsers<T>): Parser<T> => {
     return createMatcher({
-        parse(str){
-            return _matchSeq(str,parsers) as ParseResult<T>
+        __parse__AllowUnconsumed__(str){
+            return _matchSeq(str,parsers) as ParserResultInner<T>
         }
     })
 }
 
-export const _matchSeq = <T>(str:string,parsers:Parser<T>[]):ParseResult<T[]> => {
-    const fn = (cur:string,num:number = 0,prev:ParseResultSuccess<T[]>={result:"exact",content:[]}):ParseResult<T[]> => {
+export const _matchSeq = <T>(str:string,parsers:Parser<T>[]):ParserResultInner<T[]> => {
+    const fn = (cur:string,num:number = 0,prev:T[]=[]):ParserResultInner<T[]> => {
         const parser = parsers[num]
-        if(typeof parser == "undefined")return prev;
-        const res = _matchSeqSingle(cur,parser);
+        const res = parser.__parse__AllowUnconsumed__(cur)
         switch (res.result) {
-            case "exact":
             case "match":
-                return fn(res.right,num + 1,{
-                    result:res.result,
-                    content:[...prev.content,res.content]
-                })
+                if(parsers[num + 1]) {
+                    return fn(res.unconsumed,num + 1,[...prev,res.content])
+                } else {
+                    return {result:"match",content:[...prev,res.content],unconsumed:res.unconsumed}
+                }
             case "not":
                 return {
                     result:res.result
@@ -105,28 +135,4 @@ export const _matchSeq = <T>(str:string,parsers:Parser<T>[]):ParseResult<T[]> =>
         }
     }
     return fn(str);
-}
-
-type SearchResult<T> = (ParseResultSuccess <T> & {right:string}) | ParseResultFailure
-export const _matchSeqSingle = <T>(str:string,parser:Parser<T>):SearchResult<T> => {
-    const fn = (num:number = 1,prev:SearchResult<T> = {result:"not"}):SearchResult<T> => {
-        if(num > str.length) return prev;
-        const target = str.substr(0,num);
-        const res = parser.parse(target);
-        switch (res.result) {
-            case "exact":
-                return {
-                    ...res,
-                    right:str.substr(num)
-                }
-            case "match":
-                return fn(num + 1,{
-                    ...res,
-                    right:str.substr(num)
-                }) 
-            case "not":
-                return fn(num + 1,prev)
-        }
-    }
-    return fn()
 }
