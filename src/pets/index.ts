@@ -1,3 +1,5 @@
+import { asConst } from "./util";
+
 export interface Parser<T> {
     consume(str:string):ParseResultInner<T>,
     parse(str:string):ParseResult<T>
@@ -192,6 +194,34 @@ export const str = <S extends string>(literal:S):Parser<S> => {
             const [,,unconsumed] = result
             return {content:literal,result:"match",unconsumed}
         },
+    })
+}
+
+type LeftRec<L,R> = [LeftRec<L,R>,R] | L
+export const lrec = <L,R>(left:Parser<L>,right:Parser<R>): Parser<LeftRec<L,R>> => {
+    return createParser({
+        consume(str){
+            const first = left.consume(str)
+            if(first.result === "failure"){
+                return {
+                    result:"failure"
+                }
+            }
+            const fn = (cur:string = first.unconsumed,prev:LeftRec<L,R>=first.content): ParseResultInner<LeftRec<L,R>> => {
+                const r = right.consume(cur)
+                switch (r.result) {
+                    case "match":
+                        return fn(r.unconsumed,[prev,r.content])
+                    case "failure":
+                        return {
+                            result:"match",
+                            content:prev,
+                            unconsumed:cur
+                        }
+                }
+            }
+            return fn();
+        }
     })
 }
 

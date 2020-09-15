@@ -1,4 +1,4 @@
-import { regexp, str, sequence, Parser, choice, lazy, repeat, ParseResult } from "."
+import { regexp, str, sequence, Parser, choice, lazy, repeat, ParseResult, lrec } from "."
 
 const log = (name: string) => (...args: any) => console.log(name, ...args)
 
@@ -63,6 +63,13 @@ test("XML", () => {
     expect(res1).toEqual(expect1)
     const res2 = Xml.parse("<a>hello</b>")
     expect(res2).toEqual({result:"failure"})
+})
+
+test("lrec",() => {
+    const Num = regexp("[1-9][0-9]*").then(parseInt)
+    const AdditiveExpression = lrec(Num,sequence(str("+"),Num))
+    const res1 = AdditiveExpression.parse("10+90+11")
+    expect(res1).toStrictEqual( { result: 'match', content: [ [ 10, ["+", 90] ], [ '+', 11 ] ] })
 })
 
 test("Calulate Additive", () => {
