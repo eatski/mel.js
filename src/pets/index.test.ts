@@ -1,10 +1,10 @@
-import { regexp, chars, sequence, Parser, choice, recur, multi, ParserResult } from "."
+import { regexp, str, sequence, Parser, choice, lazy, repeat, ParseResult } from "."
 
 const log = (name: string) => (...args: any) => console.log(name, ...args)
 
 test("sequence", () => {
     const Num = regexp("[1-9][0-9]*").then(parseInt)
-    const AdditiveExpression = sequence(Num, chars("+"), Num)
+    const AdditiveExpression = sequence(Num, str("+"), Num)
     const res1 = AdditiveExpression.parse("11+12")
     expect(res1).toStrictEqual({ result: "match", content: [11, '+', 12] })
 })
@@ -25,7 +25,7 @@ test("choice", () => {
 })
 
 test("not",() => {
-    const Bool = choice(chars("false"),chars("true"))
+    const Bool = choice(str("false"),str("true"))
     const AtoZ = regexp("[1-9a-z]*")
     const res1 = AtoZ.not(Bool).parse("false")
     expect(res1).toEqual({result:"failure"})
@@ -36,20 +36,20 @@ test("not",() => {
 test("XML", () => {
     const Text = regexp("[a-zA-z]+")
     const TagName = regexp("[a-z]+")
-    const TagStart = sequence(chars("<"), TagName, chars(">")).then(([, name,]) => name)
-    const TagEnd = sequence(chars("</"), TagName, chars(">")).then(([, name,]) => name)
+    const TagStart = sequence(str("<"), TagName, str(">")).then(([, name,]) => name)
+    const TagEnd = sequence(str("</"), TagName, str(">")).then(([, name,]) => name)
     type Xml = {
         tagName: string,
         elements: (Xml | string)[]
     }
     const Xml: Parser<Xml> =
-        recur(() => sequence(TagStart, Elements, TagEnd))
+        lazy(() => sequence(TagStart, Elements, TagEnd))
             .validate(([tagStart,,tagEnd])=> tagStart === tagEnd)
             .then(([tagName, elements]) => ({ tagName, elements }))
     const Element = choice(Xml, Text)
-    const Elements = multi(Element)
+    const Elements = repeat(Element)
     const res1 = Xml.parse("<body><p>hello</p>world<div>friend</div></body>")
-    const expect1: ParserResult<Xml> = {
+    const expect1: ParseResult<Xml> = {
         result: "match",
         content: {
             tagName: "body",
@@ -67,8 +67,8 @@ test("XML", () => {
 
 test("Calulate Additive", () => {
     const Num = regexp("[1-9][0-9]*").then(parseInt)
-    const AdditveOperator = chars("+")
-    const Additive = recur(() => choice(AdditiveExpression, Num))
+    const AdditveOperator = str("+")
+    const Additive = lazy(() => choice(AdditiveExpression, Num))
     const AdditiveExpression: Parser<number> = sequence(Num, AdditveOperator, Additive)
         .then(([left, , right]) => left + right)
     const res1 = AdditiveExpression.parse("10+90+11")
@@ -77,9 +77,9 @@ test("Calulate Additive", () => {
 
 test("Additive", () => {
     const Num = regexp("[1-9][0-9]*").then(parseInt)
-    const AdditveOperator = chars("+")
+    const AdditveOperator = str("+")
     type Additive = AdditiveExpression | number
-    const Additive = recur(() => choice(AdditiveExpression, Num))
+    const Additive = lazy(() => choice(AdditiveExpression, Num))
     type AdditiveExpression = [number, "+", Additive]
     const AdditiveExpression: Parser<AdditiveExpression> = sequence(Num, AdditveOperator, Additive)
     const res1 = AdditiveExpression.parse("10+90+11")

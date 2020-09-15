@@ -1,9 +1,9 @@
 export interface Parser<T> {
-    __parse__AllowUnconsumed__(str:string):ParserResultInner<T>,
-    parse(str:string):ParserResult<T>
-    then<R>(mapper: (result:T) => R):Parser<R>,
+    consume(str:string):ParseResultInner<T>,
+    parse(str:string):ParseResult<T>
+    then<R>(action: (result:T) => R):Parser<R>,
     validate(predicate: (result:T) => boolean):Parser<T>
-    onParsed(cb:(str:string,parsed:ParserResultInner<T>) => void):Parser<T>,
+    onParsed(cb:(str:string,parsed:ParseResultInner<T>) => void):Parser<T>,
     not(parser:Parser<unknown>):Parser<T>
 }
 type Parsers<T> = { [P in keyof T]: Parser<T[P]> };
@@ -13,22 +13,22 @@ type ParseResultSuccess<T> = {result:ParseResultTypeSuccess,content:T}
 type ParseResultSuccessInner<T> = {result:ParseResultTypeSuccess,content:T,unconsumed:string}
 type ParseResultFailure = {result:ParseResultTypeFailure}
 
-type ParserResultInner<T> = ParseResultFailure | ParseResultSuccessInner<T>
-export type ParserResult<T> = ParseResultFailure | ParseResultSuccess<T>
+type ParseResultInner<T> = ParseResultFailure | ParseResultSuccessInner<T>
+export type ParseResult<T> = ParseResultFailure | ParseResultSuccess<T>
 
-const createMatcher = <T>(arg:Pick<Parser<T>,"__parse__AllowUnconsumed__">):Parser<T> => {
+const createParser = <T>(arg:Pick<Parser<T>,"consume">):Parser<T> => {
     return {
         ...arg,
-        then(mapper){
-            return createMatcher({
-                __parse__AllowUnconsumed__(str:string){
-                    const res = arg.__parse__AllowUnconsumed__(str)
+        then(action){
+            return createParser({
+                consume(str:string){
+                    const res = arg.consume(str)
                     switch (res.result) {
                         case "match":
                             return {
                                 result:res.result,
                                 unconsumed:res.unconsumed,
-                                content:mapper(res.content),
+                                content:action(res.content),
                             }
                         case "failure":
                             return {
@@ -39,16 +39,16 @@ const createMatcher = <T>(arg:Pick<Parser<T>,"__parse__AllowUnconsumed__">):Pars
             })
         },
         onParsed(cb){
-            return createMatcher({
-                __parse__AllowUnconsumed__(str){
-                    const res = arg.__parse__AllowUnconsumed__(str)
+            return createParser({
+                consume(str){
+                    const res = arg.consume(str)
                     cb(str,res);
                     return res;
                 }
             })
         },
         parse(str){
-            const res = arg.__parse__AllowUnconsumed__(str);
+            const res = arg.consume(str);
             if(res.result === "failure"){
                 return res
             }
@@ -63,9 +63,9 @@ const createMatcher = <T>(arg:Pick<Parser<T>,"__parse__AllowUnconsumed__">):Pars
             }
         },
         validate(predicate){
-            return createMatcher({
-                __parse__AllowUnconsumed__(str:string){
-                    const res = arg.__parse__AllowUnconsumed__(str)
+            return createParser({
+                consume(str:string){
+                    const res = arg.consume(str)
                     switch (res.result) {
                         case "match":
                             return predicate(res.content) ? res : {
@@ -80,38 +80,38 @@ const createMatcher = <T>(arg:Pick<Parser<T>,"__parse__AllowUnconsumed__">):Pars
             })
         },
         not(parser){
-            return createMatcher({
-                __parse__AllowUnconsumed__(str:string){
-                    const checked = parser.__parse__AllowUnconsumed__(str);
+            return createParser({
+                consume(str:string){
+                    const checked = parser.consume(str);
                     switch (checked.result) {
                         case "match":            
                             return {result:"failure"}
                         case "failure":
-                            return arg.__parse__AllowUnconsumed__(str)
+                            return arg.consume(str)
                     }
                 }
             })
         }
     }
 }
-export const recur = <T>(factory:() => Parser<T>):Parser<T> => createMatcher({
-    __parse__AllowUnconsumed__(str){
-        return factory().__parse__AllowUnconsumed__(str);
+export const lazy = <T>(factory:() => Parser<T>):Parser<T> => createParser({
+    consume(str){
+        return factory().consume(str);
     }
 })
 
 export const sequence = <T extends Array<unknown>>(...parsers:Parsers<T>): Parser<T> => {
-    return createMatcher({
-        __parse__AllowUnconsumed__(str){
-            return _matchSeq(str,parsers) as ParserResultInner<T>
+    return createParser({
+        consume(str){
+            return _matchSeq(str,parsers) as ParseResultInner<T>
         }
     })
 }
 
-const _matchSeq = <T>(str:string,parsers:Parser<T>[]):ParserResultInner<T[]> => {
-    const fn = (cur:string,num:number = 0,prev:T[]=[]):ParserResultInner<T[]> => {
+const _matchSeq = <T>(str:string,parsers:Parser<T>[]):ParseResultInner<T[]> => {
+    const fn = (cur:string,num:number = 0,prev:T[]=[]):ParseResultInner<T[]> => {
         const parser = parsers[num]
-        const res = parser.__parse__AllowUnconsumed__(cur)
+        const res = parser.consume(cur)
         switch (res.result) {
             case "match":
                 const content = [...prev,res.content]
@@ -126,12 +126,12 @@ const _matchSeq = <T>(str:string,parsers:Parser<T>[]):ParserResultInner<T[]> => 
 }
 
 export const choice = <T extends Array<unknown>>(...parsers:Parsers<T>) :Parser<T[number]> => {
-    return createMatcher({
-        __parse__AllowUnconsumed__(str){
-            const fn = (num:number = 0):ParserResultInner<T[number]> => {
+    return createParser({
+        consume(str){
+            const fn = (num:number = 0):ParseResultInner<T[number]> => {
                 const parser = parsers[num]
                 if(typeof parser == "undefined") return {result:"failure"};
-                const res = parser.__parse__AllowUnconsumed__(str);
+                const res = parser.consume(str);
                 switch (res.result) {
                     case "match":  
                         return res
@@ -144,11 +144,11 @@ export const choice = <T extends Array<unknown>>(...parsers:Parsers<T>) :Parser<
     })
 }
 
-export const multi = <T>(parser:Parser<T>) : Parser<T[]> => {
-    return createMatcher({
-        __parse__AllowUnconsumed__(str){
-            const fn = (cur:string=str,acc:T[]=[]):ParserResultInner<T[]> => {
-                const res = parser.__parse__AllowUnconsumed__(cur);
+export const repeat = <T>(parser:Parser<T>) : Parser<T[]> => {
+    return createParser({
+        consume(str){
+            const fn = (cur:string=str,acc:T[]=[]):ParseResultInner<T[]> => {
+                const res = parser.consume(cur);
                 switch (res.result) {
                     case "match":
                         const content = [...acc,res.content]
@@ -166,25 +166,25 @@ export const multi = <T>(parser:Parser<T>) : Parser<T[]> => {
 
 export const regexp = (exp:string):Parser<string> => {
     const matcher = new RegExp(`^(${exp})(.*)$`)
-    return createMatcher({
-        __parse__AllowUnconsumed__(str){
+    return createParser({
+        consume(str){
             const result = matcher.exec(str);
             if(!result){
                 return {result:"failure"}
             }
             const [,content,unconsumed] = result
-            return {content:content,result:"match",unconsumed}
+            return {content,result:"match",unconsumed}
         },
     })
 }
 
 const escapeRegExp = (text:string) => text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
 
-export const chars = <S extends string>(literal:S):Parser<S> => {
+export const str = <S extends string>(literal:S):Parser<S> => {
     const escaped = escapeRegExp(literal);
     const matcher = new RegExp(`^(${escaped})(.*)$`)
-    return createMatcher({
-        __parse__AllowUnconsumed__(str){
+    return createParser({
+        consume(str){
             const result = matcher.exec(str);
             if(!result){
                 return {result:"failure"}
