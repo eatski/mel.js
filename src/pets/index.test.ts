@@ -24,7 +24,16 @@ test("choice", () => {
     })
 })
 
-test("multi", () => {
+test("not",() => {
+    const Bool = choice(chars("false"),chars("true"))
+    const AtoZ = regexp("[1-9a-z]*")
+    const res1 = AtoZ.not(Bool).parse("false")
+    expect(res1).toEqual({result:"failure"})
+    const res2 = AtoZ.not(Bool).parse("notfalse")
+    expect(res2).toEqual({result:"match",content:"notfalse"})
+})
+
+test("XML", () => {
     const Text = regexp("[a-zA-z]+")
     const TagName = regexp("[a-z]+")
     const TagStart = sequence(chars("<"), TagName, chars(">")).then(([, name,]) => name)
@@ -35,11 +44,12 @@ test("multi", () => {
     }
     const Xml: Parser<Xml> =
         recur(() => sequence(TagStart, Elements, TagEnd))
+            .validate(([tagStart,,tagEnd])=> tagStart === tagEnd)
             .then(([tagName, elements]) => ({ tagName, elements }))
     const Element = choice(Xml, Text)
     const Elements = multi(Element)
-    const res3 = Xml.parse("<body><p>hello</p>world<div>friend</div></body>")
-    const expect3: ParserResult<Xml> = {
+    const res1 = Xml.parse("<body><p>hello</p>world<div>friend</div></body>")
+    const expect1: ParserResult<Xml> = {
         result: "match",
         content: {
             tagName: "body",
@@ -50,7 +60,9 @@ test("multi", () => {
             ]
         }
     }
-    expect(res3).toEqual(expect3)
+    expect(res1).toEqual(expect1)
+    const res2 = Xml.parse("<a>hello</b>")
+    expect(res2).toEqual({result:"failure"})
 })
 
 test("Calulate Additive", () => {
