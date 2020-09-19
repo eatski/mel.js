@@ -197,32 +197,32 @@ export const str = <S extends string>(literal:S):Parser<S> => {
     })
 }
 
-type LeftRec<L,R> = [LeftRec<L,R>,R] | L
+type LeftRec<L,R> = [L,R[]]
 export const lrec = <L,R>(left:Parser<L>,right:Parser<R>): Parser<LeftRec<L,R>> => {
     return createParser({
-        consume(str){
-            const first = left.consume(str)
-            if(first.result === "failure"){
+        consume(str) {
+            const first = left.consume(str);
+            if (first.result === "failure") {
                 return {
-                    result:"failure"
-                }
+                    result: "failure"
+                };
             }
-            const fn = (cur:string = first.unconsumed,prev:LeftRec<L,R>=first.content): ParseResultInner<LeftRec<L,R>> => {
-                const r = right.consume(cur)
+            const fn = (cur: string = first.unconsumed, prev: R[] = []): ParseResultInner<LeftRec<L, R>> => {
+                const r = right.consume(cur);
                 switch (r.result) {
                     case "match":
-                        return fn(r.unconsumed,[prev,r.content])
+                        return fn(r.unconsumed, [...prev,r.content]);
                     case "failure":
                         return {
-                            result:"match",
-                            content:prev,
-                            unconsumed:cur
-                        }
+                            result: "match",
+                            content: [first.content, prev],
+                            unconsumed: cur
+                        };
                 }
-            }
+            };
             return fn();
         }
-    })
+    });
 }
 
 

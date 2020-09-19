@@ -24,13 +24,13 @@ test("choice", () => {
     })
 })
 
-test("not",() => {
-    const Bool = choice(str("false"),str("true"))
+test("not", () => {
+    const Bool = choice(str("false"), str("true"))
     const AtoZ = regexp("[1-9a-z]*")
     const res1 = AtoZ.not(Bool).parse("false")
-    expect(res1).toEqual({result:"failure"})
+    expect(res1).toEqual({ result: "failure" })
     const res2 = AtoZ.not(Bool).parse("notfalse")
-    expect(res2).toEqual({result:"match",content:"notfalse"})
+    expect(res2).toEqual({ result: "match", content: "notfalse" })
 })
 
 test("XML", () => {
@@ -44,7 +44,7 @@ test("XML", () => {
     }
     const Xml: Parser<Xml> =
         lazy(() => sequence(TagStart, Elements, TagEnd))
-            .validate(([tagStart,,tagEnd])=> tagStart === tagEnd)
+            .validate(([tagStart, , tagEnd]) => tagStart === tagEnd)
             .then(([tagName, elements]) => ({ tagName, elements }))
     const Element = choice(Xml, Text)
     const Elements = repeat(Element)
@@ -62,14 +62,14 @@ test("XML", () => {
     }
     expect(res1).toEqual(expect1)
     const res2 = Xml.parse("<a>hello</b>")
-    expect(res2).toEqual({result:"failure"})
+    expect(res2).toEqual({ result: "failure" })
 })
 
-test("lrec",() => {
+test("lrec", () => {
     const Num = regexp("[1-9][0-9]*").then(parseInt)
-    const AdditiveExpression = lrec(Num,sequence(str("+"),Num))
+    const AdditiveExpression = lrec(Num, sequence(str("+"), Num))
     const res1 = AdditiveExpression.parse("10+90+11")
-    expect(res1).toStrictEqual( { result: 'match', content: [ [ 10, ["+", 90] ], [ '+', 11 ] ] })
+    expect(res1).toStrictEqual({ result: 'match', content: [10, [["+", 90], ['+', 11]]] })
 })
 
 test("Calulate Additive", () => {
