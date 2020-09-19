@@ -1,5 +1,3 @@
-import { asConst } from "./util";
-
 export interface Parser<T> {
     consume(str:string):ParseResultInner<T>,
     parse(str:string):ParseResult<T>
@@ -13,7 +11,7 @@ type ParseResultTypeSuccess = "match"
 type ParseResultTypeFailure = "failure" 
 type ParseResultSuccess<T> = {result:ParseResultTypeSuccess,content:T}
 type ParseResultSuccessInner<T> = {result:ParseResultTypeSuccess,content:T,unconsumed:string}
-type ParseResultFailure = {result:ParseResultTypeFailure}
+type ParseResultFailure = {result:ParseResultTypeFailure,messages:string[],cause:string}
 
 type ParseResultInner<T> = ParseResultFailure | ParseResultSuccessInner<T>
 export type ParseResult<T> = ParseResultFailure | ParseResultSuccess<T>
@@ -33,9 +31,7 @@ const createParser = <T>(arg:Pick<Parser<T>,"consume">):Parser<T> => {
                                 content:action(res.content),
                             }
                         case "failure":
-                            return {
-                                result:res.result
-                            }
+                            return res
                     }
                 }
             })
@@ -61,7 +57,9 @@ const createParser = <T>(arg:Pick<Parser<T>,"consume">):Parser<T> => {
                 }
             }
             return {
-                result:"failure"
+                result:"failure",
+                messages:[`Expect EOF. But '${res.unconsumed}' was found`],
+                cause:str
             }
         },
         validate(predicate){
@@ -71,12 +69,12 @@ const createParser = <T>(arg:Pick<Parser<T>,"consume">):Parser<T> => {
                     switch (res.result) {
                         case "match":
                             return predicate(res.content) ? res : {
-                                result:"failure"
+                                result:"failure",
+                                messages:["Validation Error"],
+                                cause:str                      
                             }
                         case "failure":
-                            return {
-                                result:"failure"
-                            }
+                            return res
                     }
                 }
             })
@@ -86,8 +84,8 @@ const createParser = <T>(arg:Pick<Parser<T>,"consume">):Parser<T> => {
                 consume(str:string){
                     const checked = parser.consume(str);
                     switch (checked.result) {
-                        case "match":            
-                            return {result:"failure"}
+                        case "match":      
+                            return {result:"failure",messages:["TODO:"],cause:str}
                         case "failure":
                             return arg.consume(str)
                     }
@@ -121,7 +119,7 @@ const _matchSeq = <T>(str:string,parsers:Parser<T>[]):ParseResultInner<T[]> => {
                     fn(res.unconsumed,num + 1,content) : 
                     {result:"match",content,unconsumed:res.unconsumed}
             case "failure":
-                return {result:"failure"}
+                return res
         }
     }
     return fn(str);
@@ -130,15 +128,19 @@ const _matchSeq = <T>(str:string,parsers:Parser<T>[]):ParseResultInner<T[]> => {
 export const choice = <T extends Array<unknown>>(...parsers:Parsers<T>) :Parser<T[number]> => {
     return createParser({
         consume(str){
-            const fn = (num:number = 0):ParseResultInner<T[number]> => {
+            const fn = (num:number = 0,messages:string[] = []):ParseResultInner<T[number]> => {
                 const parser = parsers[num]
-                if(typeof parser == "undefined") return {result:"failure"};
+                if(typeof parser == "undefined") return {
+                    result:"failure",
+                    messages,
+                    cause:str
+                };
                 const res = parser.consume(str);
                 switch (res.result) {
                     case "match":  
                         return res
                     case "failure":
-                        return fn(num + 1)
+                        return fn(num + 1,[...messages,...res.messages])
                 }
             }
             return fn()
@@ -166,13 +168,17 @@ export const repeat = <T>(parser:Parser<T>) : Parser<T[]> => {
     })
 }
 
-export const regexp = (exp:string):Parser<string> => {
-    const matcher = new RegExp(`^(${exp})(.*)$`)
+export const regexp = (exp:RegExp):Parser<string> => {
+    const matcher = new RegExp(`^(${exp.source})([\\s\\S]*)$`)
     return createParser({
         consume(str){
             const result = matcher.exec(str);
             if(!result){
-                return {result:"failure"}
+                return {
+                    result:"failure",
+                    messages:[`Regexp not matched: '${exp}'`],
+                    cause:str
+                }
             }
             const [,content,unconsumed] = result
             return {content,result:"match",unconsumed}
@@ -184,46 +190,23 @@ const escapeRegExp = (text:string) => text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '
 
 export const str = <S extends string>(literal:S):Parser<S> => {
     const escaped = escapeRegExp(literal);
-    const matcher = new RegExp(`^(${escaped})(.*)$`)
+    const matcher = new RegExp(`^${escaped}([\\s\\S]*)$`)
     return createParser({
         consume(str){
             const result = matcher.exec(str);
             if(!result){
-                return {result:"failure"}
+                return {
+                    result:"failure",
+                    messages:[`Literal not matched: '${literal}'`],
+                    cause:str
+                }
             }
-            const [,,unconsumed] = result
+            const [,unconsumed] = result
             return {content:literal,result:"match",unconsumed}
         },
     })
 }
 
-type LeftRec<L,R> = [L,R[]]
-export const lrec = <L,R>(left:Parser<L>,right:Parser<R>): Parser<LeftRec<L,R>> => {
-    return createParser({
-        consume(str) {
-            const first = left.consume(str);
-            if (first.result === "failure") {
-                return {
-                    result: "failure"
-                };
-            }
-            const fn = (cur: string = first.unconsumed, prev: R[] = []): ParseResultInner<LeftRec<L, R>> => {
-                const r = right.consume(cur);
-                switch (r.result) {
-                    case "match":
-                        return fn(r.unconsumed, [...prev,r.content]);
-                    case "failure":
-                        return {
-                            result: "match",
-                            content: [first.content, prev],
-                            unconsumed: cur
-                        };
-                }
-            };
-            return fn();
-        }
-    });
-}
 
 
 

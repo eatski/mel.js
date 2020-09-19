@@ -1,17 +1,17 @@
-import { regexp, str, sequence, Parser, choice, lazy, repeat, ParseResult, lrec } from "."
+import { regexp, str, sequence, Parser, choice, lazy, repeat, ParseResult } from "."
 
 const log = (name: string) => (...args: any) => console.log(name, ...args)
 
 test("sequence", () => {
-    const Num = regexp("[1-9][0-9]*").then(parseInt)
+    const Num = regexp(/[1-9][0-9]*/).then(parseInt)
     const AdditiveExpression = sequence(Num, str("+"), Num)
     const res1 = AdditiveExpression.parse("11+12")
     expect(res1).toStrictEqual({ result: "match", content: [11, '+', 12] })
 })
 
 test("choice", () => {
-    const Num = regexp("[1-9][0-9]*").then(parseInt)
-    const AtoZ = regexp("[1-9a-z]*")
+    const Num = regexp(/[1-9][0-9]*/).then(parseInt)
+    const AtoZ = regexp(/[1-9a-z]*/)
     const res1 = choice(Num, AtoZ).parse("a1")
     expect(res1).toStrictEqual({
         result: "match",
@@ -26,54 +26,86 @@ test("choice", () => {
 
 test("not", () => {
     const Bool = choice(str("false"), str("true"))
-    const AtoZ = regexp("[1-9a-z]*")
+    const AtoZ = regexp(/[1-9a-z]*/)
     const res1 = AtoZ.not(Bool).parse("false")
-    expect(res1).toEqual({ result: "failure" })
+    const expect1 : typeof res1 = {
+        result:"failure",
+        cause:"false",
+        messages:["TODO:"]
+    }
+    expect(res1).toEqual(expect1)
     const res2 = AtoZ.not(Bool).parse("notfalse")
     expect(res2).toEqual({ result: "match", content: "notfalse" })
 })
 
 test("XML", () => {
-    const Text = regexp("[a-zA-z]+")
-    const TagName = regexp("[a-z]+")
-    const TagStart = sequence(str("<"), TagName, str(">")).then(([, name,]) => name)
-    const TagEnd = sequence(str("</"), TagName, str(">")).then(([, name,]) => name)
-    type Xml = {
+    const Text = regexp(/[\w ]+/)
+    const Blank = regexp(/\s*/)
+    const trimableRight = <T>(parser:Parser<T>) : Parser<T> => sequence(parser,Blank).then(([left])=> left)
+    const trimable = <T>(parser:Parser<T>) : Parser<T> => sequence(Blank,parser,Blank).then(([,content])=> content)
+    const simpleMutliLines = `
+        hoge
+    `
+    const blankRes = trimable(str("hoge")).parse(simpleMutliLines)
+    const blankExpected : typeof blankRes = {
+        result:"match",
+        content:"hoge"
+    }
+    expect(blankRes).toEqual(blankExpected)
+    const TagName = trimableRight(regexp(/[a-z]+/))
+    const AttrName = regexp(/[a-zA-z]+/)
+    const AttrValue = sequence(str("'"),Text,str("'")).then(([,text]) => text)
+    const Attr = trimableRight(sequence(AttrName,str("="),AttrValue).then(([name,,value])=> ({name,value})))
+    const TagStart = trimableRight(sequence(str("<"),TagName, repeat(Attr) ,str(">")).then(([, name,attrs]) => ({name,attrs})))
+    const TagEnd = sequence(str("</"), TagName,Blank, str(">")).then(([, name,]) => name)
+    type TaggedElement = {
         tagName: string,
-        elements: (Xml | string)[]
+        elements: (TaggedElement | string)[],
+        attrs:{name:string,value:string}[]
     }
-    const Xml: Parser<Xml> =
-        lazy(() => sequence(TagStart, Elements, TagEnd))
-            .validate(([tagStart, , tagEnd]) => tagStart === tagEnd)
-            .then(([tagName, elements]) => ({ tagName, elements }))
-    const Element = choice(Xml, Text)
-    const Elements = repeat(Element)
-    const res1 = Xml.parse("<body><p>hello</p>world<div>friend</div></body>")
-    const expect1: ParseResult<Xml> = {
+    const TaggedElement: Parser<TaggedElement> =
+        sequence(TagStart, lazy(() => XML), TagEnd)
+            .validate(([tagStart, , tagEnd]) => tagStart.name === tagEnd)
+            .then(([tagStart, elements]) => ({ tagName:tagStart.name,attrs:tagStart.attrs,elements }))
+    const Element = choice(trimable(TaggedElement), Text)
+    const XML = repeat(Element)
+
+    const xmlText = "<body><p class='hoge'>hello</p>world<div>friend</div></body>"
+    const res = XML.parse(xmlText)
+    const expected : typeof res = {
         result: "match",
-        content: {
+        content: [{
             tagName: "body",
+            attrs:[],
             elements: [
-                { tagName: "p", elements: ["hello"] },
+                { tagName: "p", attrs:[{name:"class",value:"hoge"}],elements: ["hello"] },
                 "world",
-                { tagName: "div", elements: ["friend"] }
+                { tagName: "div", attrs:[],elements: ["friend"] }
             ]
-        }
+        }]
     }
-    expect(res1).toEqual(expect1)
-    const res2 = Xml.parse("<a>hello</b>")
-    expect(res2).toEqual({ result: "failure" })
+    expect(res).toEqual(expected)
+    const xmlTextWithMutliLines = `
+        <body>
+            <p class='hoge'>hello</p>
+            world
+            <div>friend</div>
+        </body>
+    `
+    const resNL = XML.parse(xmlTextWithMutliLines)
+    expect(resNL).toEqual(expected)
+    const res2 = TaggedElement.parse("<a>hello</b>")
+    const expected2 : typeof res2 = {
+        result:"failure",
+        messages:["Validation Error"],
+        cause:"<a>hello</b>"
+    }
+    expect(res2).toEqual(expected2)
 })
 
-test("lrec", () => {
-    const Num = regexp("[1-9][0-9]*").then(parseInt)
-    const AdditiveExpression = lrec(Num, sequence(str("+"), Num))
-    const res1 = AdditiveExpression.parse("10+90+11")
-    expect(res1).toStrictEqual({ result: 'match', content: [10, [["+", 90], ['+', 11]]] })
-})
 
 test("Calulate Additive", () => {
-    const Num = regexp("[1-9][0-9]*").then(parseInt)
+    const Num = regexp(/[1-9][0-9]*/).then(parseInt)
     const AdditveOperator = str("+")
     const Additive = lazy(() => choice(AdditiveExpression, Num))
     const AdditiveExpression: Parser<number> = sequence(Num, AdditveOperator, Additive)
@@ -83,7 +115,7 @@ test("Calulate Additive", () => {
 })
 
 test("Additive", () => {
-    const Num = regexp("[1-9][0-9]*").then(parseInt)
+    const Num = regexp(/[1-9][0-9]*/).then(parseInt)
     const AdditveOperator = str("+")
     type Additive = AdditiveExpression | number
     const Additive = lazy(() => choice(AdditiveExpression, Num))
